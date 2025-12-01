@@ -1,8 +1,7 @@
-import errno
 import os
-import select
 import stat
 import subprocess
+import threading
 import time
 from pathlib import Path
 from typing import Optional
@@ -124,6 +123,11 @@ def _terminate_process(proc: Optional[subprocess.Popen], name: str) -> None:
                     proc.wait(timeout=2)
                 except subprocess.TimeoutExpired:
                     print(f"[{name}] ffmpeg kill timeout")
+    if proc.stdout:
+        try:
+            proc.stdout.close()
+        except Exception:
+            pass
     if proc.stderr:
         try:
             proc.stderr.close()
@@ -146,22 +150,128 @@ def _drain_process_stderr(proc: subprocess.Popen) -> str:
         return ""
 
 
-def _wait_fd_readable(fd: int, path: Path, timeout: float, *, proc: Optional[subprocess.Popen] = None, proc_name: str = "") -> None:
-    deadline = time.monotonic() + timeout
-    while True:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError(f"Timed out waiting for writer on FIFO {path}")
-        if proc is not None and proc.poll() is not None:
-            stderr_msg = _drain_process_stderr(proc)
-            msg = f"{proc_name or 'subprocess'} exited with {proc.returncode}"
-            if stderr_msg:
-                msg = f"{msg}: {stderr_msg}"
-            raise RuntimeError(msg)
-        rlist, _, _ = select.select([fd], [], [], remaining)
-        if rlist:
+class MicAudioPort(pj.AudioMediaPort):
+    def __init__(
+        self,
+        call_id: int,
+        ffmpeg_cmd: list[str],
+        sample_rate: int,
+        channels: int,
+        frame_time_usec: int,
+        bits_per_sample: int = 16,
+    ) -> None:
+        super().__init__()
+        self.call_id = call_id
+        self.ffmpeg_cmd = ffmpeg_cmd
+        self.sample_rate = sample_rate
+        self.channels = channels
+        self.frame_time_usec = frame_time_usec
+        self.bits_per_sample = bits_per_sample
+        self.proc: Optional[subprocess.Popen] = None
+        self._buffer = bytearray()
+        self._lock = threading.Lock()
+        self._stop = False
+        self._last_error: Optional[str] = None
+
+        bytes_per_sample = max(1, bits_per_sample // 8)
+        samples_per_frame = max(1, int(self.sample_rate * self.frame_time_usec / 1_000_000))
+        self._channel_stride = self.channels * bytes_per_sample
+        self._frame_bytes = samples_per_frame * self._channel_stride
+
+    def start(self) -> None:
+        self._stop = False
+        self._buffer.clear()
+        self._last_error = None
+
+        fmt = pj.MediaFormatAudio()
+        fmt.init(
+            pj.PJMEDIA_TYPE_AUDIO,
+            self.sample_rate,
+            self.channels,
+            self.frame_time_usec,
+            self.bits_per_sample,
+            0,
+            0,
+        )
+        self.createPort(f"mic-port-{self.call_id}", fmt)
+
+        try:
+            self.proc = subprocess.Popen(
+                self.ffmpeg_cmd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except FileNotFoundError as err:
+            raise RuntimeError("ffmpeg binary not found for mic pipeline") from err
+
+        if self.proc.stdout is None:
+            raise RuntimeError("mic pipeline did not expose stdout pipe")
+
+    def stop(self) -> None:
+        self._stop = True
+        if self.proc and self.proc.stdout:
+            try:
+                self.proc.stdout.close()
+            except Exception:
+                pass
+        if self.proc:
+            _terminate_process(self.proc, f"call {self.call_id} mic")
+            self.proc = None
+
+    def get_last_error(self) -> Optional[str]:
+        return self._last_error
+
+    def _capture_process_error(self) -> None:
+        if not self.proc:
             return
-        time.sleep(0.05)
+        exit_code = self.proc.returncode
+        stderr_msg = _drain_process_stderr(self.proc)
+        if stderr_msg:
+            self._last_error = f"ffmpeg mic exited with {exit_code}: {stderr_msg}"
+        else:
+            self._last_error = f"ffmpeg mic exited with {exit_code}"
+
+    def onFrameRequested(self, frame: pj.MediaFrame) -> None:  # type: ignore[override]
+        with self._lock:
+            needed = frame.size if frame.size > 0 else self._frame_bytes
+            if needed <= 0:
+                needed = self._frame_bytes or self._channel_stride
+
+            data = bytearray()
+
+            while len(data) < needed and not self._stop:
+                if self._buffer:
+                    take = min(needed - len(data), len(self._buffer))
+                    data += self._buffer[:take]
+                    del self._buffer[:take]
+                    continue
+
+                if not self.proc or not self.proc.stdout:
+                    break
+
+                chunk = self.proc.stdout.read(needed - len(data))
+                if chunk:
+                    data += chunk
+                    continue
+
+                if self.proc.poll() is not None:
+                    self._capture_process_error()
+                    self._stop = True
+                    break
+
+                break
+
+            if len(data) < needed:
+                data.extend(b"\x00" * (needed - len(data)))
+
+            if len(data) > needed:
+                self._buffer.extend(data[needed:])
+                data = data[:needed]
+
+            frame.buf.assign_from_bytes(bytes(data))
+            frame.size = len(data)
+            frame.type = pj.PJMEDIA_FRAME_TYPE_AUDIO
 
 
 class RtspAudioBridge:
@@ -169,18 +279,14 @@ class RtspAudioBridge:
         self.call_id = call_id
         self.audio_media = audio_media
         self.recorder: Optional[pj.AudioMediaRecorder] = None
-        self.player: Optional[pj.AudioMediaPlayer] = None
         self.ffmpeg_spk: Optional[subprocess.Popen] = None
-        self.ffmpeg_mic: Optional[subprocess.Popen] = None
         self.fifo_spk = RTSP_FIFO_ROOT / f"call_{call_id}_spk.wav"
-        self.fifo_mic = RTSP_FIFO_ROOT / f"call_{call_id}_mic.wav"
-        self._fifo_mic_guard_fd: Optional[int] = None
         self.mic_ready = False
         self.last_mic_error: Optional[str] = None
+        self.mic_port: Optional[MicAudioPort] = None
 
     def start(self) -> bool:
         _ensure_fifo(self.fifo_spk)
-        _ensure_fifo(self.fifo_mic)
         self.mic_ready = False
         self.last_mic_error = None
         try:
@@ -205,24 +311,24 @@ class RtspAudioBridge:
                 self.audio_media.stopTransmit(self.recorder)
             except pj.Error:
                 pass
-        if self.player and self.audio_media and _media_port_valid(self.player):
+        if self.mic_port and self.audio_media and _media_port_valid(self.mic_port):
             try:
-                self.player.stopTransmit(self.audio_media)
+                self.mic_port.stopTransmit(self.audio_media)
             except pj.Error:
                 pass
 
-        self._close_fifo_guard()
+        if self.mic_port:
+            self.mic_port.stop()
+            if not self.last_mic_error:
+                self.last_mic_error = self.mic_port.get_last_error()
+            self.mic_port = None
 
         _terminate_process(self.ffmpeg_spk, f"call {self.call_id} spk")
-        _terminate_process(self.ffmpeg_mic, f"call {self.call_id} mic")
 
         self.ffmpeg_spk = None
-        self.ffmpeg_mic = None
         self.recorder = None
-        self.player = None
 
         _cleanup_fifo(self.fifo_spk)
-        _cleanup_fifo(self.fifo_mic)
 
     def _start_spk_pipeline(self) -> None:
         ffmpeg_cmd = [
@@ -284,7 +390,11 @@ class RtspAudioBridge:
             raise RuntimeError(f"pjsua2 recorder init failed: {err}")
 
     def _start_mic_pipeline(self) -> None:
-        guard_fd: Optional[int] = None
+        sample_rate = int(os.getenv("FFMPEG_MIC_AR", "16000"))
+        channels = int(os.getenv("FFMPEG_MIC_AC", "1"))
+        bits_per_sample = int(os.getenv("FFMPEG_MIC_BITS", "16"))
+        frame_time_usec = int(os.getenv("RTSP_MIC_FRAME_TIME", "20000"))
+
         ffmpeg_cmd = [
             FFMPEG_BIN,
             "-hide_banner",
@@ -299,76 +409,44 @@ class RtspAudioBridge:
             "-acodec",
             os.getenv("FFMPEG_MIC_CODEC", "pcm_s16le"),
             "-ar",
-            os.getenv("FFMPEG_MIC_AR", "16000"),
+            str(sample_rate),
             "-ac",
-            os.getenv("FFMPEG_MIC_AC", "1"),
+            str(channels),
             "-f",
-            "wav",
-            str(self.fifo_mic),
+            os.getenv("FFMPEG_MIC_FMT", "s16le"),
+            "pipe:1",
         ]
 
-        try:
-            guard_fd = os.open(str(self.fifo_mic), os.O_RDONLY | os.O_NONBLOCK)
-            self._fifo_mic_guard_fd = guard_fd
-        except OSError as err:
-            raise RuntimeError(f"failed to open FIFO guard for mic: {err}") from err
+        mic_port = MicAudioPort(
+            self.call_id,
+            ffmpeg_cmd,
+            sample_rate,
+            channels,
+            frame_time_usec,
+            bits_per_sample,
+        )
+
+        mic_port.start()
 
         try:
-            self.ffmpeg_mic = subprocess.Popen(
-                ffmpeg_cmd,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-            )
-        except FileNotFoundError as err:
-            self._close_fifo_guard()
-            raise RuntimeError("ffmpeg binary not found for mic pipeline") from err
-
-        try:
-            _wait_fd_readable(
-                guard_fd,
-                self.fifo_mic,
-                timeout=float(os.getenv("RTSP_MIC_FIFO_TIMEOUT", "5")),
-                proc=self.ffmpeg_mic,
-                proc_name="ffmpeg mic pipeline",
-            )
-        except TimeoutError as err:
-            self._close_fifo_guard()
-            raise RuntimeError(str(err)) from err
-
-        time.sleep(float(os.getenv("RTSP_MIC_READY_DELAY", "0.1")))
-
-        self.player = pj.AudioMediaPlayer()
-        try:
-            self.player.createPlayer(str(self.fifo_mic))
-            self.player.startTransmit(self.audio_media)
+            mic_port.startTransmit(self.audio_media)
         except pj.Error as err:
-            self._close_fifo_guard()
-            self.player = None
-            raise RuntimeError(f"pjsua2 player init failed: {err}")
-        else:
-            self._close_fifo_guard()
+            mic_port.stop()
+            raise RuntimeError(f"pjsua2 mic port transmit failed: {err}")
+
+        self.mic_port = mic_port
 
     def _cleanup_failed_mic(self) -> None:
-        self._close_fifo_guard()
-        if self.player and self.audio_media and _media_port_valid(self.player):
+        if self.mic_port and self.audio_media and _media_port_valid(self.mic_port):
             try:
-                self.player.stopTransmit(self.audio_media)
+                self.mic_port.stopTransmit(self.audio_media)
             except pj.Error:
                 pass
-        self.player = None
-        if self.ffmpeg_mic:
-            _terminate_process(self.ffmpeg_mic, f"call {self.call_id} mic")
-            self.ffmpeg_mic = None
-
-
-    def _close_fifo_guard(self) -> None:
-        if self._fifo_mic_guard_fd is not None:
-            try:
-                os.close(self._fifo_mic_guard_fd)
-            except OSError:
-                pass
-            self._fifo_mic_guard_fd = None
+        if self.mic_port:
+            self.mic_port.stop()
+            if not self.last_mic_error:
+                self.last_mic_error = self.mic_port.get_last_error()
+        self.mic_port = None
 
 
 class MyCall(pj.Call):
