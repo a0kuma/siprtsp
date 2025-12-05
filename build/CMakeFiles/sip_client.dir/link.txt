@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/sip_client.dir/sip_client.cpp.o -o sip_client  -llinphone++ -lmediastreamer -lortp -lbctoolbox -lbellesip -lbelcard 

@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/list_audio_devices.dir/list_audio_devices.cpp.o -o list_audio_devices  -llinphone++ -lmediastreamer -lortp -lbctoolbox -lbellesip -lbelcard 

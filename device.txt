@@ -1,0 +1,27 @@
+evice 0:
+  ID: PulseAudio Unknown: Built-in Audio Analog Stereo
+  Device Name: Built-in Audio Analog Stereo
+  Driver Name: PulseAudio
+  Capabilities: Record Playback 
+  Type: Unknown
+
+Device 1:
+  ID: PulseAudio Unknown: AD102 High Definition Audio Controller Digital Stereo (HDMI)
+  Device Name: AD102 High Definition Audio Controller Digital Stereo (HDMI)
+  Driver Name: PulseAudio
+  Capabilities: Playback 
+  Type: Unknown
+
+Device 2:
+  ID: PulseAudio Unknown: VirtualAudio
+  Device Name: VirtualAudio
+  Driver Name: PulseAudio
+  Capabilities: Playback 
+  Type: Unknown
+
+Device 3:
+  ID: ALSA Unknown: default
+  Device Name: default
+  Driver Name: ALSA
+  Capabilities: Record Playback 
+  Type: Unknown

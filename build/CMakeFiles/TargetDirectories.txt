@@ -1,0 +1,4 @@
+/home/andy/mycode/siprtsp/build/CMakeFiles/list_audio_devices.dir
+/home/andy/mycode/siprtsp/build/CMakeFiles/sip_client.dir
+/home/andy/mycode/siprtsp/build/CMakeFiles/edit_cache.dir
+/home/andy/mycode/siprtsp/build/CMakeFiles/rebuild_cache.dir
