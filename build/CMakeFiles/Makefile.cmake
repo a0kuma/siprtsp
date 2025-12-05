@@ -49,4 +49,5 @@ set(CMAKE_MAKEFILE_PRODUCTS
 set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/list_audio_devices.dir/DependInfo.cmake"
   "CMakeFiles/sip_client.dir/DependInfo.cmake"
+  "CMakeFiles/setup_rtsp_audio.dir/DependInfo.cmake"
   )

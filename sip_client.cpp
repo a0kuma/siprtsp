@@ -6,10 +6,22 @@
 #include <fstream>
 #include <csignal>
 #include <cstdlib>
+#include <atomic>
 #include <linphone++/linphone.hh>
 
 using namespace std;
 using namespace linphone;
+
+// RTSP stream URLs for virtual audio devices
+// These can be overridden via environment variables
+string VIRTUAL_MIC = "rtsp://140.112.31.164:8554/u5004/mic";
+string VIRTUAL_SPK = "rtsp://140.112.31.164:8554/u5004/spk";
+
+// Virtual device names (PulseAudio/PipeWire device names)
+// These should match the devices created by setup_rtsp_audio.sh
+// Note: linphone sees PulseAudio device descriptions, not sink names
+string VIRTUAL_MIC_DEVICE = "RTSP_Mic";       // Remap-source with Record capability
+string VIRTUAL_SPK_DEVICE = "RTSP_Speaker";   // Sink for speaker output
 
 // Global flag for shutdown
 volatile sig_atomic_t g_running = 1;
@@ -106,6 +118,55 @@ string getenv_str(const char* name) {
     return val ? string(val) : "";
 }
 
+// Load RTSP URLs from environment if set
+void load_rtsp_config() {
+    string mic = getenv_str("VIRTUAL_MIC");
+    string spk = getenv_str("VIRTUAL_SPK");
+    string mic_dev = getenv_str("VIRTUAL_MIC_DEVICE");
+    string spk_dev = getenv_str("VIRTUAL_SPK_DEVICE");
+    
+    if (!mic.empty()) VIRTUAL_MIC = mic;
+    if (!spk.empty()) VIRTUAL_SPK = spk;
+    if (!mic_dev.empty()) VIRTUAL_MIC_DEVICE = mic_dev;
+    if (!spk_dev.empty()) VIRTUAL_SPK_DEVICE = spk_dev;
+    
+    cout << "[config] VIRTUAL_MIC: " << VIRTUAL_MIC << endl;
+    cout << "[config] VIRTUAL_SPK: " << VIRTUAL_SPK << endl;
+    cout << "[config] VIRTUAL_MIC_DEVICE: " << VIRTUAL_MIC_DEVICE << endl;
+    cout << "[config] VIRTUAL_SPK_DEVICE: " << VIRTUAL_SPK_DEVICE << endl;
+}
+
+// Helper function to find audio device by name pattern
+shared_ptr<AudioDevice> findAudioDevice(const list<shared_ptr<AudioDevice>>& devices, 
+                                         const string& pattern,
+                                         AudioDevice::Capabilities requiredCaps) {
+    // First try exact capability match
+    for (const auto& dev : devices) {
+        string devName = dev->getDeviceName();
+        string devId = dev->getId();
+        auto caps = dev->getCapabilities();
+        
+        // Check if device name or ID contains the pattern
+        if ((devName.find(pattern) != string::npos || devId.find(pattern) != string::npos) &&
+            (static_cast<int>(caps) & static_cast<int>(requiredCaps))) {
+            return dev;
+        }
+    }
+    
+    // If not found with required caps, try matching by name only (for cases where 
+    // PipeWire/PulseAudio may report capabilities differently)
+    for (const auto& dev : devices) {
+        string devName = dev->getDeviceName();
+        string devId = dev->getId();
+        
+        if (devName.find(pattern) != string::npos || devId.find(pattern) != string::npos) {
+            return dev;
+        }
+    }
+    
+    return nullptr;
+}
+
 // Core listener to handle incoming calls and registration state
 class MyCoreListener : public CoreListener {
 public:
@@ -137,18 +198,22 @@ public:
                 // Call is established and media is flowing
                 cout << "[call " << callId << "] CONFIRMED, audio streams running" << endl;
                 
-                // Get current audio devices
+                // Show current device configuration (set at core startup)
                 auto inputDevice = call->getInputAudioDevice();
                 auto outputDevice = call->getOutputAudioDevice();
                 
+                cout << "[call " << callId << "] Audio configuration:" << endl;
                 if (inputDevice) {
-                    cout << "[call " << callId << "] Input device: " << inputDevice->getDeviceName() << endl;
+                    cout << "[call " << callId << "]   Input:  " << inputDevice->getDeviceName() << endl;
                 }
                 if (outputDevice) {
-                    cout << "[call " << callId << "] Output device: " << outputDevice->getDeviceName() << endl;
+                    cout << "[call " << callId << "]   Output: " << outputDevice->getDeviceName() << endl;
                 }
                 
-                cout << "[call " << callId << "] Audio bridged to default devices" << endl;
+                cout << "[call " << callId << "] RTSP streams:" << endl;
+                cout << "[call " << callId << "]   MIC <- " << VIRTUAL_MIC << endl;
+                cout << "[call " << callId << "]   SPK -> " << VIRTUAL_SPK << endl;
+                
                 break;
             }
             
@@ -228,6 +293,9 @@ int main() {
     // Load .env file
     load_dotenv();
     
+    // Load RTSP configuration
+    load_rtsp_config();
+    
     // Get SIP configuration from environment
     string sip_domain = getenv_str("SIP_DOMAIN");
     string sip_user = getenv_str("SIP_USER");
@@ -245,57 +313,149 @@ int main() {
     // Create Linphone factory and core
     shared_ptr<Factory> factory = Factory::get();
     
+    // Set resource paths for linphone data files (grammars, etc.)
+    // These are typically installed in /usr/share/linphone or /usr/local/share/linphone
+    string dataDir = "/usr/share/linphone";
+    string altDataDir = "/usr/local/share/linphone";
+    
+    // Check which path exists
+    ifstream testFile(dataDir + "/rootca.pem");
+    if (!testFile.good()) {
+        testFile.open(altDataDir + "/rootca.pem");
+        if (testFile.good()) {
+            dataDir = altDataDir;
+        }
+    }
+    testFile.close();
+    
+    // Set top resources directory - this helps linphone find its grammar files
+    factory->setTopResourcesDir(dataDir);
+    factory->setDataResourcesDir(dataDir);
+    factory->setImageResourcesDir(dataDir + "/images");
+    factory->setRingResourcesDir(dataDir + "/rings");
+    factory->setSoundResourcesDir(dataDir + "/sounds");
+    
+    cout << "[ep] Using linphone data dir: " << dataDir << endl;
+    
     // Create core with default config (no config file, no factory config)
     shared_ptr<Core> core = factory->createCore("", "", nullptr);
     
     // Set log level (similar to pjsua2 level 4)
     factory->enableLogCollection(LogCollectionState::Disabled);
     
+    // Configure audio to use RTSP streams
+    // Set the input (microphone) to use the RTSP mic stream
+    // Set the output (speaker) to use the RTSP spk stream
+    // Note: This requires setting up virtual audio devices via PulseAudio/PipeWire
+    // that are connected to the RTSP streams using GStreamer or FFmpeg
+    cout << "[ep] Configuring RTSP audio streams..." << endl;
+    cout << "[ep] Note: Ensure virtual audio devices are set up for RTSP streams" << endl;
+    
     // Create and add core listener
     auto listener = make_shared<MyCoreListener>();
     core->addListener(listener);
     
-    // Configure transports - UDP on ephemeral port (0 = OS chooses)
-    shared_ptr<Transports> transports = factory->createTransports();
-    transports->setUdpPort(0);  // Let OS choose port, similar to LOCAL_SIP_PORT = 0
+    // Start the core first
+    core->start();
+    cout << "[ep] Linphone core started" << endl;
+    
+    // Configure transports - use random high port to avoid conflicts
+    auto transports = core->getTransports();
+    transports->setUdpPort(-1);  // -1 = random available port
+    transports->setTcpPort(-1);  // -1 = random available port
     core->setTransports(transports);
     
-    // Start the core
-    core->start();
-    cout << "[ep] Linphone started, listening on UDP" << endl;
+    // Print actual ports used
+    transports = core->getTransports();
+    cout << "[ep] Transports configured - UDP:" << transports->getUdpPort() 
+         << " TCP:" << transports->getTcpPort() << endl;
     
-    // Create account configuration
-    shared_ptr<AccountParams> accountParams = core->createAccountParams();
+    // Set default audio devices to RTSP virtual devices BEFORE any calls
+    // This is necessary because setInputAudioDevice/setOutputAudioDevice during a call
+    // doesn't work with PulseAudio backend
+    {
+        auto audioDevices = core->getExtendedAudioDevices();
+        cout << "[ep] Available audio devices:" << endl;
+        for (const auto& dev : audioDevices) {
+            auto caps = dev->getCapabilities();
+            string capsStr = "";
+            if (static_cast<int>(caps) & static_cast<int>(AudioDevice::Capabilities::CapabilityRecord)) {
+                capsStr += "Record ";
+            }
+            if (static_cast<int>(caps) & static_cast<int>(AudioDevice::Capabilities::CapabilityPlay)) {
+                capsStr += "Play ";
+            }
+            cout << "  - " << dev->getDeviceName() << " [" << capsStr << "]" << endl;
+        }
+        
+        // Find and set default input device (mic)
+        auto micDevice = findAudioDevice(audioDevices, VIRTUAL_MIC_DEVICE, 
+                                          AudioDevice::Capabilities::CapabilityRecord);
+        if (micDevice) {
+            core->setDefaultInputAudioDevice(micDevice);
+            cout << "[ep] Set default input to: " << micDevice->getDeviceName() << endl;
+        } else {
+            cout << "[ep] WARNING: Virtual mic '" << VIRTUAL_MIC_DEVICE << "' not found!" << endl;
+        }
+        
+        // Find and set default output device (speaker)
+        auto spkDevice = findAudioDevice(audioDevices, VIRTUAL_SPK_DEVICE,
+                                          AudioDevice::Capabilities::CapabilityPlay);
+        if (spkDevice) {
+            core->setDefaultOutputAudioDevice(spkDevice);
+            cout << "[ep] Set default output to: " << spkDevice->getDeviceName() << endl;
+        } else {
+            cout << "[ep] WARNING: Virtual speaker '" << VIRTUAL_SPK_DEVICE << "' not found!" << endl;
+        }
+    }
     
     // Set identity (SIP URI)
     string identity = "sip:" + sip_user + "@" + sip_domain;
     shared_ptr<Address> identityAddr = factory->createAddress(identity);
-    accountParams->setIdentityAddress(identityAddr);
+    if (!identityAddr) {
+        cerr << "Error: Failed to create identity address: " << identity << endl;
+        return 1;
+    }
     
-    // Set server/registrar address
-    string serverAddr = "sip:" + sip_domain;
-    shared_ptr<Address> serverAddress = factory->createAddress(serverAddr);
-    accountParams->setServerAddress(serverAddress);
-    
-    // Enable registration
-    accountParams->enableRegister(true);
-    
-    // Create and add account
-    shared_ptr<Account> account = core->createAccount(accountParams);
-    
-    // Set authentication info
+    // Add authentication info first
     shared_ptr<AuthInfo> authInfo = factory->createAuthInfo(
-        sip_user,      // username
-        "",            // userid (empty = use username)
-        sip_passwd,    // password
-        "",            // ha1 (empty = use password)
-        sip_domain,    // realm
-        sip_domain     // domain
+        sip_user,          // username
+        sip_user,          // userid 
+        sip_passwd,        // password
+        "",                // ha1 (empty = use password)
+        "",                // realm (empty = accept any)
+        sip_domain         // domain
     );
     core->addAuthInfo(authInfo);
+    cout << "[auth] Added auth info for " << sip_user << "@" << sip_domain << endl;
     
-    // Set as default account
-    core->setDefaultAccount(account);
+    // Create proxy config (the older but more reliable approach)
+    shared_ptr<ProxyConfig> proxyCfg = core->createProxyConfig();
+    
+    // Set identity
+    proxyCfg->setIdentityAddress(identityAddr);
+    
+    // Set server address
+    string serverAddr = "sip:" + sip_domain;
+    proxyCfg->setServerAddr(serverAddr);
+    
+    // Set route (same as server)
+    proxyCfg->setRoute(serverAddr);
+    
+    // Enable registration
+    proxyCfg->enableRegister(true);
+    
+    // Set registration expiry
+    proxyCfg->setExpires(3600);
+    
+    // Disable publish
+    proxyCfg->enablePublish(false);
+    
+    // Add proxy config to core
+    core->addProxyConfig(proxyCfg);
+    
+    // Set as default
+    core->setDefaultProxyConfig(proxyCfg);
     
     cout << "[acc] Created and registering as " << identity << endl;
     
@@ -312,10 +472,10 @@ int main() {
     core->terminateAllCalls();
     
     // Unregister
-    if (account) {
-        auto params = account->getParams()->clone();
-        params->enableRegister(false);
-        account->setParams(params);
+    if (proxyCfg) {
+        proxyCfg->edit();
+        proxyCfg->enableRegister(false);
+        proxyCfg->done();
     }
     
     // Wait a bit for unregister to complete

@@ -1,6 +1,7 @@
-CMakeFiles/sip_client.dir/sip_client.cpp.o: \
- /home/andy/mycode/siprtsp/sip_client.cpp /usr/include/stdc-predef.h \
- /usr/include/c++/13/iostream /usr/include/c++/13/bits/requires_hosted.h \
+CMakeFiles/setup_rtsp_audio.dir/setup_rtsp_audio.cpp.o: \
+ /home/andy/mycode/siprtsp/setup_rtsp_audio.cpp \
+ /usr/include/stdc-predef.h /usr/include/c++/13/iostream \
+ /usr/include/c++/13/bits/requires_hosted.h \
  /usr/include/x86_64-linux-gnu/c++/13/bits/c++config.h \
  /usr/include/x86_64-linux-gnu/c++/13/bits/os_defines.h \
  /usr/include/features.h /usr/include/features-time64.h \
@@ -148,36 +149,11 @@ CMakeFiles/sip_client.dir/sip_client.cpp.o: \
  /usr/include/c++/13/bits/locale_facets.tcc \
  /usr/include/c++/13/bits/basic_ios.tcc \
  /usr/include/c++/13/bits/ostream.tcc /usr/include/c++/13/istream \
- /usr/include/c++/13/bits/istream.tcc /usr/include/c++/13/memory \
- /usr/include/c++/13/bits/stl_tempbuf.h \
+ /usr/include/c++/13/bits/istream.tcc /usr/include/c++/13/vector \
  /usr/include/c++/13/bits/stl_uninitialized.h \
- /usr/include/c++/13/bits/stl_raw_storage_iter.h \
- /usr/include/c++/13/bits/align.h \
- /usr/lib/gcc/x86_64-linux-gnu/13/include/stdint.h /usr/include/stdint.h \
- /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
- /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
- /usr/include/c++/13/bits/unique_ptr.h \
- /usr/include/c++/13/bits/shared_ptr.h \
- /usr/include/c++/13/bits/shared_ptr_base.h \
- /usr/include/c++/13/bits/allocated_ptr.h \
- /usr/include/c++/13/ext/aligned_buffer.h \
- /usr/include/c++/13/ext/concurrence.h \
- /usr/include/c++/13/bits/shared_ptr_atomic.h \
- /usr/include/c++/13/bits/atomic_base.h \
- /usr/include/c++/13/bits/atomic_lockfree_defines.h \
- /usr/include/c++/13/backward/auto_ptr.h \
- /usr/include/c++/13/pstl/glue_memory_defs.h \
- /usr/include/c++/13/pstl/execution_defs.h /usr/include/c++/13/thread \
- /usr/include/c++/13/bits/std_thread.h \
- /usr/include/c++/13/bits/this_thread_sleep.h \
- /usr/include/c++/13/bits/chrono.h /usr/include/c++/13/ratio \
- /usr/include/c++/13/cstdint /usr/include/c++/13/limits \
- /usr/include/c++/13/ctime /usr/include/c++/13/bits/parse_numbers.h \
- /usr/include/c++/13/chrono /usr/include/c++/13/fstream \
- /usr/include/c++/13/bits/codecvt.h \
- /usr/include/x86_64-linux-gnu/c++/13/bits/basic_file.h \
- /usr/include/x86_64-linux-gnu/c++/13/bits/c++io.h \
- /usr/include/c++/13/bits/fstream.tcc /usr/include/c++/13/csignal \
+ /usr/include/c++/13/bits/stl_vector.h \
+ /usr/include/c++/13/bits/stl_bvector.h \
+ /usr/include/c++/13/bits/vector.tcc /usr/include/c++/13/csignal \
  /usr/include/signal.h \
  /usr/include/x86_64-linux-gnu/bits/signum-generic.h \
  /usr/include/x86_64-linux-gnu/bits/signum-arch.h \
@@ -207,83 +183,48 @@ CMakeFiles/sip_client.dir/sip_client.cpp.o: \
  /usr/include/x86_64-linux-gnu/bits/types/struct_sigstack.h \
  /usr/include/x86_64-linux-gnu/bits/sigthread.h \
  /usr/include/x86_64-linux-gnu/bits/signal_ext.h \
- /usr/include/c++/13/atomic /usr/include/linphone++/linphone.hh \
- /usr/include/linphone++/enums.hh \
- /usr/include/linphone++/conference_scheduler_listener.hh \
- /usr/include/c++/13/list /usr/include/c++/13/bits/stl_list.h \
- /usr/include/c++/13/bits/list.tcc \
- /usr/include/linphone++/conference_scheduler.hh \
- /usr/include/linphone++/object.hh /usr/include/c++/13/map \
- /usr/include/c++/13/bits/stl_tree.h \
- /usr/include/c++/13/bits/node_handle.h \
- /usr/include/c++/13/bits/stl_map.h \
- /usr/include/c++/13/bits/stl_multimap.h \
- /usr/include/c++/13/bits/erase_if.h \
- /usr/include/linphone++/participant_device_listener.hh \
- /usr/include/linphone++/account_creator_listener.hh \
- /usr/include/linphone++/account_creator.hh \
- /usr/include/linphone++/logging_service_listener.hh \
- /usr/include/linphone++/xml_rpc_request_listener.hh \
- /usr/include/linphone++/magic_search_listener.hh \
- /usr/include/linphone++/chat_message_listener.hh \
- /usr/include/linphone++/chat_message.hh \
- /usr/include/linphone++/conference_listener.hh \
- /usr/include/linphone++/conference.hh \
- /usr/include/linphone++/friend_list_listener.hh \
- /usr/include/linphone++/friend_list.hh \
- /usr/include/linphone++/chat_room_listener.hh \
- /usr/include/linphone++/chat_room.hh \
- /usr/include/linphone++/account_listener.hh \
- /usr/include/linphone++/player_listener.hh \
- /usr/include/linphone++/event_listener.hh \
- /usr/include/linphone++/core_listener.hh /usr/include/linphone++/call.hh \
- /usr/include/linphone++/core.hh \
- /usr/include/linphone++/presence_activity.hh \
- /usr/include/linphone++/call_listener.hh \
- /usr/include/linphone++/digest_authentication_policy.hh \
- /usr/include/linphone++/participant_device_identity.hh \
- /usr/include/linphone++/push_notification_message.hh \
- /usr/include/linphone++/push_notification_config.hh \
- /usr/include/linphone++/video_source_descriptor.hh \
- /usr/include/linphone++/video_activation_policy.hh \
- /usr/include/linphone++/participant_imdn_state.hh \
- /usr/include/linphone++/participant_device.hh \
- /usr/include/linphone++/friend_phone_number.hh \
- /usr/include/linphone++/conference_params.hh \
- /usr/include/linphone++/video_definition.hh \
- /usr/include/linphone++/presence_service.hh \
- /usr/include/linphone++/recorder_params.hh \
- /usr/include/linphone++/conference_info.hh \
- /usr/include/linphone++/logging_service.hh \
- /usr/include/linphone++/chat_room_params.hh \
- /usr/include/linphone++/presence_person.hh \
- /usr/include/linphone++/xml_rpc_request.hh \
- /usr/include/linphone++/xml_rpc_session.hh \
- /usr/include/linphone++/im_notif_policy.hh \
- /usr/include/linphone++/account_params.hh \
- /usr/include/linphone++/presence_model.hh \
- /usr/include/linphone++/search_result.hh \
- /usr/include/linphone++/tunnel_config.hh \
- /usr/include/linphone++/presence_note.hh \
- /usr/include/linphone++/info_message.hh \
- /usr/include/linphone++/magic_search.hh \
- /usr/include/linphone++/audio_device.hh \
- /usr/include/linphone++/proxy_config.hh \
- /usr/include/linphone++/participant.hh \
- /usr/include/linphone++/payload_type.hh \
- /usr/include/linphone++/ldap_params.hh \
- /usr/include/linphone++/transports.hh \
- /usr/include/linphone++/call_params.hh \
- /usr/include/linphone++/error_info.hh \
- /usr/include/linphone++/call_stats.hh \
- /usr/include/linphone++/nat_policy.hh \
- /usr/include/linphone++/auth_info.hh \
- /usr/include/linphone++/dial_plan.hh /usr/include/linphone++/recorder.hh \
- /usr/include/linphone++/event_log.hh /usr/include/linphone++/headers.hh \
- /usr/include/linphone++/content.hh /usr/include/linphone++/factory.hh \
- /usr/include/linphone++/address.hh /usr/include/linphone++/call_log.hh \
- /usr/include/linphone++/account.hh /usr/include/linphone++/buffer.hh \
- /usr/include/linphone++/config.hh /usr/include/linphone++/tunnel.hh \
- /usr/include/linphone++/player.hh /usr/include/linphone++/friend.hh \
- /usr/include/linphone++/range.hh /usr/include/linphone++/vcard.hh \
- /usr/include/linphone++/event.hh /usr/include/linphone++/ldap.hh
+ /usr/include/c++/13/cstring /usr/include/string.h /usr/include/strings.h \
+ /usr/include/x86_64-linux-gnu/sys/wait.h \
+ /usr/include/x86_64-linux-gnu/bits/types/idtype_t.h \
+ /usr/include/termios.h /usr/include/x86_64-linux-gnu/bits/termios.h \
+ /usr/include/x86_64-linux-gnu/bits/termios-struct.h \
+ /usr/include/x86_64-linux-gnu/bits/termios-c_cc.h \
+ /usr/include/x86_64-linux-gnu/bits/termios-c_iflag.h \
+ /usr/include/x86_64-linux-gnu/bits/termios-c_oflag.h \
+ /usr/include/x86_64-linux-gnu/bits/termios-baud.h \
+ /usr/include/x86_64-linux-gnu/bits/termios-c_cflag.h \
+ /usr/include/x86_64-linux-gnu/bits/termios-c_lflag.h \
+ /usr/include/x86_64-linux-gnu/bits/termios-tcflow.h \
+ /usr/include/x86_64-linux-gnu/bits/termios-misc.h \
+ /usr/include/x86_64-linux-gnu/sys/ttydefaults.h /usr/include/fcntl.h \
+ /usr/include/x86_64-linux-gnu/bits/fcntl.h \
+ /usr/include/x86_64-linux-gnu/bits/fcntl-linux.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct_iovec.h \
+ /usr/include/linux/falloc.h /usr/include/x86_64-linux-gnu/bits/stat.h \
+ /usr/include/x86_64-linux-gnu/bits/struct_stat.h /usr/include/poll.h \
+ /usr/include/x86_64-linux-gnu/sys/poll.h \
+ /usr/include/x86_64-linux-gnu/bits/poll.h /usr/include/c++/13/filesystem \
+ /usr/include/c++/13/bits/fs_fwd.h /usr/include/c++/13/cstdint \
+ /usr/lib/gcc/x86_64-linux-gnu/13/include/stdint.h /usr/include/stdint.h \
+ /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
+ /usr/include/x86_64-linux-gnu/bits/stdint-least.h \
+ /usr/include/c++/13/bits/chrono.h /usr/include/c++/13/ratio \
+ /usr/include/c++/13/limits /usr/include/c++/13/ctime \
+ /usr/include/c++/13/bits/parse_numbers.h \
+ /usr/include/c++/13/bits/fs_path.h /usr/include/c++/13/locale \
+ /usr/include/c++/13/bits/locale_facets_nonio.h \
+ /usr/include/x86_64-linux-gnu/c++/13/bits/time_members.h \
+ /usr/include/x86_64-linux-gnu/c++/13/bits/messages_members.h \
+ /usr/include/libintl.h /usr/include/c++/13/bits/codecvt.h \
+ /usr/include/c++/13/bits/locale_facets_nonio.tcc \
+ /usr/include/c++/13/bits/locale_conv.h /usr/include/c++/13/iomanip \
+ /usr/include/c++/13/bits/quoted_string.h /usr/include/c++/13/sstream \
+ /usr/include/c++/13/bits/sstream.tcc /usr/include/c++/13/codecvt \
+ /usr/include/c++/13/ext/concurrence.h \
+ /usr/include/c++/13/bits/shared_ptr.h \
+ /usr/include/c++/13/bits/shared_ptr_base.h \
+ /usr/include/c++/13/bits/allocated_ptr.h \
+ /usr/include/c++/13/bits/unique_ptr.h \
+ /usr/include/c++/13/ext/aligned_buffer.h \
+ /usr/include/c++/13/bits/fs_dir.h /usr/include/c++/13/bits/fs_ops.h \
+ /usr/include/linux/limits.h

@@ -142,6 +142,19 @@ sip_client/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/sip_client.dir/build.make CMakeFiles/sip_client.dir/build
 .PHONY : sip_client/fast
 
+#=============================================================================
+# Target rules for targets named setup_rtsp_audio
+
+# Build rule for target.
+setup_rtsp_audio: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 setup_rtsp_audio
+.PHONY : setup_rtsp_audio
+
+# fast build rule for target.
+setup_rtsp_audio/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/setup_rtsp_audio.dir/build.make CMakeFiles/setup_rtsp_audio.dir/build
+.PHONY : setup_rtsp_audio/fast
+
 list_audio_devices.o: list_audio_devices.cpp.o
 .PHONY : list_audio_devices.o
 
@@ -165,6 +178,30 @@ list_audio_devices.s: list_audio_devices.cpp.s
 list_audio_devices.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/list_audio_devices.dir/build.make CMakeFiles/list_audio_devices.dir/list_audio_devices.cpp.s
 .PHONY : list_audio_devices.cpp.s
+
+setup_rtsp_audio.o: setup_rtsp_audio.cpp.o
+.PHONY : setup_rtsp_audio.o
+
+# target to build an object file
+setup_rtsp_audio.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/setup_rtsp_audio.dir/build.make CMakeFiles/setup_rtsp_audio.dir/setup_rtsp_audio.cpp.o
+.PHONY : setup_rtsp_audio.cpp.o
+
+setup_rtsp_audio.i: setup_rtsp_audio.cpp.i
+.PHONY : setup_rtsp_audio.i
+
+# target to preprocess a source file
+setup_rtsp_audio.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/setup_rtsp_audio.dir/build.make CMakeFiles/setup_rtsp_audio.dir/setup_rtsp_audio.cpp.i
+.PHONY : setup_rtsp_audio.cpp.i
+
+setup_rtsp_audio.s: setup_rtsp_audio.cpp.s
+.PHONY : setup_rtsp_audio.s
+
+# target to generate assembly for a file
+setup_rtsp_audio.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/setup_rtsp_audio.dir/build.make CMakeFiles/setup_rtsp_audio.dir/setup_rtsp_audio.cpp.s
+.PHONY : setup_rtsp_audio.cpp.s
 
 sip_client.o: sip_client.cpp.o
 .PHONY : sip_client.o
@@ -199,10 +236,14 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... list_audio_devices"
+	@echo "... setup_rtsp_audio"
 	@echo "... sip_client"
 	@echo "... list_audio_devices.o"
 	@echo "... list_audio_devices.i"
 	@echo "... list_audio_devices.s"
+	@echo "... setup_rtsp_audio.o"
+	@echo "... setup_rtsp_audio.i"
+	@echo "... setup_rtsp_audio.s"
 	@echo "... sip_client.o"
 	@echo "... sip_client.i"
 	@echo "... sip_client.s"

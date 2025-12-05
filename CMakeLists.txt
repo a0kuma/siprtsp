@@ -21,3 +21,7 @@ target_include_directories(sip_client PRIVATE ${LINPHONE_INCLUDE_DIRS})
 target_link_libraries(sip_client linphone++ ${LINPHONE_LIBRARIES})
 target_link_directories(sip_client PRIVATE ${LINPHONE_LIBRARY_DIRS})
 target_compile_options(sip_client PRIVATE ${LINPHONE_CFLAGS_OTHER})
+
+# RTSP Audio Bridge utility
+add_executable(setup_rtsp_audio setup_rtsp_audio.cpp)
+target_link_libraries(setup_rtsp_audio)

@@ -5,6 +5,7 @@ CMakeFiles/sip_client.dir/sip_client.cpp.o: /home/andy/mycode/siprtsp/sip_client
   /usr/include/alloca.h \
   /usr/include/asm-generic/errno-base.h \
   /usr/include/asm-generic/errno.h \
+  /usr/include/c++/13/atomic \
   /usr/include/c++/13/backward/auto_ptr.h \
   /usr/include/c++/13/backward/binders.h \
   /usr/include/c++/13/bit \
@@ -632,12 +633,6 @@ CMakeFiles/sip_client.dir/sip_client.cpp.o: /home/andy/mycode/siprtsp/sip_client
 
 /usr/include/c++/13/bits/char_traits.h:
 
-/usr/include/c++/13/bits/basic_string.h:
-
-/usr/include/c++/13/bits/chrono.h:
-
-/usr/include/x86_64-linux-gnu/bits/endianness.h:
-
 /usr/include/locale.h:
 
 /usr/include/c++/13/bits/utility.h:
@@ -649,6 +644,36 @@ CMakeFiles/sip_client.dir/sip_client.cpp.o: /home/andy/mycode/siprtsp/sip_client
 /usr/include/c++/13/bits/basic_ios.h:
 
 /usr/include/linphone++/error_info.hh:
+
+/usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h:
+
+/usr/include/c++/13/bits/atomic_lockfree_defines.h:
+
+/usr/include/x86_64-linux-gnu/asm/errno.h:
+
+/usr/include/c++/13/bits/basic_string.h:
+
+/usr/include/c++/13/bits/chrono.h:
+
+/usr/include/x86_64-linux-gnu/bits/endianness.h:
+
+/usr/include/c++/13/atomic:
+
+/usr/include/c++/13/bits/locale_facets.h:
+
+/usr/include/x86_64-linux-gnu/bits/waitstatus.h:
+
+/usr/include/c++/13/bits/exception_defines.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/mbstate_t.h:
+
+/usr/include/c++/13/bits/unique_ptr.h:
+
+/usr/include/linphone++/logging_service.hh:
+
+/usr/include/linphone++/push_notification_message.hh:
+
+/usr/include/c++/13/bits/localefwd.h:
 
 /home/andy/mycode/siprtsp/sip_client.cpp:
 
@@ -686,41 +711,7 @@ CMakeFiles/sip_client.dir/sip_client.cpp.o: /home/andy/mycode/siprtsp/sip_client
 
 /usr/include/c++/13/bits/predefined_ops.h:
 
-/usr/include/c++/13/bits/this_thread_sleep.h:
-
-/usr/include/c++/13/streambuf:
-
-/usr/include/c++/13/bits/memory_resource.h:
-
-/usr/include/c++/13/bits/shared_ptr_base.h:
-
-/usr/include/wchar.h:
-
-/usr/include/c++/13/bits/shared_ptr.h:
-
 /usr/include/c++/13/backward/auto_ptr.h:
-
-/usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h:
-
-/usr/include/c++/13/bits/atomic_lockfree_defines.h:
-
-/usr/include/x86_64-linux-gnu/asm/errno.h:
-
-/usr/include/c++/13/bits/locale_facets.h:
-
-/usr/include/x86_64-linux-gnu/bits/waitstatus.h:
-
-/usr/include/c++/13/bits/exception_defines.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/mbstate_t.h:
-
-/usr/include/c++/13/bits/unique_ptr.h:
-
-/usr/include/linphone++/logging_service.hh:
-
-/usr/include/linphone++/push_notification_message.hh:
-
-/usr/include/c++/13/bits/localefwd.h:
 
 /usr/include/c++/13/new:
 
@@ -744,17 +735,23 @@ CMakeFiles/sip_client.dir/sip_client.cpp.o: /home/andy/mycode/siprtsp/sip_client
 
 /usr/include/c++/13/bits/codecvt.h:
 
+/usr/include/c++/13/bits/this_thread_sleep.h:
+
+/usr/include/c++/13/streambuf:
+
+/usr/include/c++/13/bits/memory_resource.h:
+
+/usr/include/c++/13/bits/shared_ptr_base.h:
+
+/usr/include/wchar.h:
+
+/usr/include/c++/13/bits/shared_ptr.h:
+
 /usr/include/c++/13/bits/functional_hash.h:
 
 /usr/include/errno.h:
 
 /usr/include/linphone++/range.hh:
-
-/usr/include/c++/13/map:
-
-/usr/include/linphone++/friend_list_listener.hh:
-
-/usr/include/c++/13/string_view:
 
 /usr/include/c++/13/bits/stl_iterator_base_funcs.h:
 
@@ -781,6 +778,12 @@ CMakeFiles/sip_client.dir/sip_client.cpp.o: /home/andy/mycode/siprtsp/sip_client
 /usr/include/x86_64-linux-gnu/bits/environments.h:
 
 /usr/include/c++/13/bits/memoryfwd.h:
+
+/usr/include/x86_64-linux-gnu/bits/setjmp.h:
+
+/usr/include/x86_64-linux-gnu/bits/getopt_posix.h:
+
+/usr/include/time.h:
 
 /usr/include/c++/13/bits/std_abs.h:
 
@@ -815,6 +818,12 @@ CMakeFiles/sip_client.dir/sip_client.cpp.o: /home/andy/mycode/siprtsp/sip_client
 /usr/include/linphone++/core.hh:
 
 /usr/include/c++/13/bits/fstream.tcc:
+
+/usr/include/c++/13/map:
+
+/usr/include/linphone++/friend_list_listener.hh:
+
+/usr/include/c++/13/string_view:
 
 /usr/include/c++/13/thread:
 
@@ -1031,9 +1040,3 @@ CMakeFiles/sip_client.dir/sip_client.cpp.o: /home/andy/mycode/siprtsp/sip_client
 /usr/include/x86_64-linux-gnu/bits/time.h:
 
 /usr/include/x86_64-linux-gnu/bits/select.h:
-
-/usr/include/x86_64-linux-gnu/bits/getopt_posix.h:
-
-/usr/include/time.h:
-
-/usr/include/x86_64-linux-gnu/bits/setjmp.h:
