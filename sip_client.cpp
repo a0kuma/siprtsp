@@ -342,7 +342,24 @@ int main() {
     
     // Set log level (similar to pjsua2 level 4)
     factory->enableLogCollection(LogCollectionState::Disabled);
+    /********************* this is not ok fix
+    // Configure NAT traversal - critical for receiving ACKs through NAT/firewall
+    // Get STUN server from environment or use a public one
+    string stun_server = getenv_str("STUN_SERVER");
+    if (stun_server.empty()) {
+        stun_server = "stun.linphone.org";  // Default public STUN server
+    }
     
+    // Create NAT policy
+    auto natPolicy = core->createNatPolicy();
+    natPolicy->setStunServer(stun_server);
+    natPolicy->enableStun(true);
+    natPolicy->enableIce(true);  // Enable ICE for NAT traversal
+    natPolicy->enableUpnp(false);
+    core->setNatPolicy(natPolicy);
+    
+    cout << "[ep] NAT policy configured - STUN: " << stun_server << ", ICE: enabled" << endl;
+    ********************* this is not ok fix  */
     // Configure audio to use RTSP streams
     // Set the input (microphone) to use the RTSP mic stream
     // Set the output (speaker) to use the RTSP spk stream
