@@ -14,6 +14,9 @@ WIDTH = 1280
 HEIGHT = 720
 FPS = 25
 
+# Audio settings
+AUDIO_SAMPLE_RATE = 48000  # Hz
+
 # If we haven't seen a frame from /abc/in within this many seconds, use noise
 SOURCE_TIMEOUT_SEC = 1.0
 
@@ -21,19 +24,26 @@ SOURCE_TIMEOUT_SEC = 1.0
 def start_ffmpeg(width, height, fps, out_url):
     """
     Start an ffmpeg process that reads raw BGR24 frames from stdin and pushes RTSP.
+    Also generates white-noise audio with anoisesrc.
     """
     cmd = [
         "ffmpeg",
         "-loglevel", "warning",
 
-        # Input from stdin: raw video frames (OpenCV gives BGR)
+        # ---- VIDEO INPUT from stdin (OpenCV BGR) ----
         "-f", "rawvideo",
         "-pix_fmt", "bgr24",
         "-s", f"{width}x{height}",
         "-r", str(fps),
-        "-i", "-",
+        "-i", "-",  # video input 0
 
-        # Encode + stream
+        # ---- AUDIO INPUT: generated white noise ----
+        # anoisesrc generates continuous noise, default color is white.
+        "-f", "lavfi",
+        "-i", f"anoisesrc=c=white:r={AUDIO_SAMPLE_RATE}:a=0.1",  # audio input 1
+
+        # ---- ENCODING SETTINGS ----
+        # Video
         "-c:v", "libx264",
         "-preset", "veryfast",
         "-tune", "zerolatency",
@@ -41,6 +51,12 @@ def start_ffmpeg(width, height, fps, out_url):
         "-profile:v", "baseline",
         "-g", str(fps * 2),
 
+        # Audio
+        "-c:a", "aac",
+        "-ar", str(AUDIO_SAMPLE_RATE),
+        "-ac", "2",
+
+        # ---- OUTPUT RTSP ----
         "-f", "rtsp",
         "-rtsp_transport", "tcp",
         out_url,
