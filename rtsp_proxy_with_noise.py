@@ -1,3 +1,6 @@
+#作廢
+
+
 #!/usr/bin/env python3
 import subprocess
 import threading
@@ -21,47 +24,103 @@ AUDIO_SAMPLE_RATE = 48000  # Hz
 SOURCE_TIMEOUT_SEC = 1.0
 
 
-def start_ffmpeg(width, height, fps, out_url):
+def start_ffmpeg(mode, width, height, fps, in_url, out_url):
     """
-    Start an ffmpeg process that reads raw BGR24 frames from stdin and pushes RTSP.
-    Also generates white-noise audio with anoisesrc.
-    """
-    cmd = [
-        "ffmpeg",
-        "-loglevel", "warning",
+    Start an ffmpeg process based on mode ('input' or 'noise').
 
-        # ---- VIDEO INPUT from stdin (OpenCV BGR) ----
+    - 'input':  video from stdin, audio = /abc/in + white noise mix
+    - 'noise':  video from stdin, audio from anoisesrc (white noise)
+    """
+    common_video_input = [
+        # VIDEO INPUT from stdin (OpenCV BGR)
         "-f", "rawvideo",
         "-pix_fmt", "bgr24",
         "-s", f"{width}x{height}",
         "-r", str(fps),
         "-i", "-",  # video input 0
-
-        # ---- AUDIO INPUT: generated white noise ----
-        # anoisesrc generates continuous noise, default color is white.
-        "-f", "lavfi",
-        "-i", f"anoisesrc=c=white:r={AUDIO_SAMPLE_RATE}:a=0.1",  # audio input 1
-
-        # ---- ENCODING SETTINGS ----
-        # Video
-        "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-tune", "zerolatency",
-        "-pix_fmt", "yuv420p",
-        "-profile:v", "baseline",
-        "-g", str(fps * 2),
-
-        # Audio
-        "-c:a", "aac",
-        "-ar", str(AUDIO_SAMPLE_RATE),
-        "-ac", "2",
-
-        # ---- OUTPUT RTSP ----
-        "-f", "rtsp",
-        "-rtsp_transport", "tcp",
-        out_url,
     ]
 
+    if mode == "input":
+        # Use RTSP audio from IN_URL + anoisesrc, mix them (約 9:1)
+        cmd = [
+            "ffmpeg",
+            "-loglevel", "warning",
+
+            # Video from stdin
+            *common_video_input,
+
+            # RTSP input for audio (and ignore its video)
+            "-rtsp_transport", "tcp",
+            "-i", in_url,  # input 1 (audio from /abc/in)
+
+            # AUDIO INPUT: generated white noise (input 2)
+            "-f", "lavfi",
+            "-i", f"anoisesrc=c=white:r={AUDIO_SAMPLE_RATE}:a=0.1",
+
+            # Audio mix: [1:a]*9 + [2:a]*1 -> [aout]
+            "-filter_complex",
+            "[1:a]volume=9[a1];[2:a]volume=1[a2];"
+            "[a1][a2]amix=inputs=2:duration=longest[aout]",
+
+            # Map: video from stdin (0:v), mixed audio [aout]
+            "-map", "0:v:0",
+            "-map", "[aout]",
+
+            # Video encode
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-tune", "zerolatency",
+            "-pix_fmt", "yuv420p",
+            "-profile:v", "baseline",
+            "-g", str(fps * 2),
+
+            # Audio encode
+            "-c:a", "aac",
+            "-ar", str(AUDIO_SAMPLE_RATE),
+            "-ac", "2",
+
+            # Output RTSP
+            "-f", "rtsp",
+            "-rtsp_transport", "tcp",
+            out_url,
+        ]
+    else:
+        # 'noise' mode: white noise audio only
+        cmd = [
+            "ffmpeg",
+            "-loglevel", "warning",
+
+            # Video from stdin
+            *common_video_input,
+
+            # AUDIO INPUT: generated white noise
+            "-f", "lavfi",
+            "-i", f"anoisesrc=c=white:r={AUDIO_SAMPLE_RATE}:a=0.1",  # input 1
+
+            # Map: video from stdin (0:v), audio from anoisesrc (1:a)
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+
+            # Video encode
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-tune", "zerolatency",
+            "-pix_fmt", "yuv420p",
+            "-profile:v", "baseline",
+            "-g", str(fps * 2),
+
+            # Audio encode
+            "-c:a", "aac",
+            "-ar", str(AUDIO_SAMPLE_RATE),
+            "-ac", "2",
+
+            # Output RTSP
+            "-f", "rtsp",
+            "-rtsp_transport", "tcp",
+            out_url,
+        ]
+
+    print(f"[ffmpeg] Starting ffmpeg in {mode.upper()} mode")
     return subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
 
@@ -128,11 +187,22 @@ class RtspReader(threading.Thread):
             self.cap.release()
 
 
-def main():
-    # Start ffmpeg publisher for /abc/out
-    ffmpeg = start_ffmpeg(WIDTH, HEIGHT, FPS, OUT_URL)
-    print(f"[main] Started ffmpeg -> {OUT_URL}")
+def stop_ffmpeg(ffmpeg):
+    if ffmpeg is None:
+        return
+    try:
+        if ffmpeg.stdin:
+            try:
+                ffmpeg.stdin.close()
+            except Exception:
+                pass
+        if ffmpeg.poll() is None:
+            ffmpeg.terminate()
+    except Exception:
+        pass
 
+
+def main():
     reader = RtspReader(IN_URL)
     reader.start()
     print(f"[main] Started RTSP reader for {IN_URL}")
@@ -141,14 +211,13 @@ def main():
     using_input = False
     last_status_print = 0.0
 
+    # ffmpeg process + mode tracking
+    ffmpeg = None
+    current_mode = None  # "input" or "noise"
+
     try:
         while True:
             loop_start = time.time()
-
-            # Check if ffmpeg is still alive
-            if ffmpeg.poll() is not None:
-                print("[main] ffmpeg exited, stopping.", file=sys.stderr)
-                break
 
             # Get freshest frame from /abc/in (if any)
             in_frame, age = reader.get_latest_frame()
@@ -158,34 +227,68 @@ def main():
                 and age <= SOURCE_TIMEOUT_SEC
             )
 
-            if use_input:
+            # Decide desired mode based on whether we have fresh input
+            desired_mode = "input" if use_input else "noise"
+
+            # If ffmpeg died for any reason, force restart in desired_mode
+            if ffmpeg is not None and ffmpeg.poll() is not None:
+                print("[main] ffmpeg exited, restarting.", file=sys.stderr)
+                stop_ffmpeg(ffmpeg)
+                ffmpeg = None
+                current_mode = None
+
+            # If mode changed, restart ffmpeg in new mode
+            if desired_mode != current_mode:
+                print(f"[main] Switching mode: {current_mode} -> {desired_mode}")
+                stop_ffmpeg(ffmpeg)
+                ffmpeg = start_ffmpeg(desired_mode, WIDTH, HEIGHT, FPS, IN_URL, OUT_URL)
+                current_mode = desired_mode
+
+            # ---- Build the frame to send (input + noise overlay) ----
+            # Base noise frame
+            noise_frame = np.random.randint(
+                0, 256, (HEIGHT, WIDTH, 3), dtype=np.uint8
+            )
+
+            if use_input and in_frame is not None:
                 # Resize to our output size if needed
                 if (in_frame.shape[1] != WIDTH) or (in_frame.shape[0] != HEIGHT):
-                    frame = cv2.resize(in_frame, (WIDTH, HEIGHT))
+                    in_resized = cv2.resize(in_frame, (WIDTH, HEIGHT))
                 else:
-                    frame = in_frame
-            else:
-                # No fresh input -> white noise (video snow)
-                frame = np.random.randint(
-                    0, 256, (HEIGHT, WIDTH, 3), dtype=np.uint8
-                )
+                    in_resized = in_frame
 
-            # Debug print when mode changes or every ~5 seconds
+                # Blend input video (9) and noise (1)
+                # frame = 0.9 * in_resized + 0.1 * noise_frame
+                frame = cv2.addWeighted(in_resized, 0.9, noise_frame, 0.1, 0)
+            else:
+                # No fresh input -> pure white noise (video snow)
+                frame = noise_frame
+
+            # Debug print when video mode changes or every ~5 seconds
             now = time.time()
             if use_input != using_input or (now - last_status_print) > 5.0:
                 using_input = use_input
                 last_status_print = now
                 if using_input:
-                    print("[main] Using /abc/in stream as source")
+                    print("[main] Using /abc/in VIDEO (mixed with noise) + AUDIO (mixed with noise)")
                 else:
-                    print("[main] Using WHITE NOISE as source")
+                    print("[main] Using WHITE NOISE VIDEO + AUDIO as source")
+
+            # If ffmpeg isn't running for some reason, start in desired_mode
+            if ffmpeg is None:
+                ffmpeg = start_ffmpeg(desired_mode, WIDTH, HEIGHT, FPS, IN_URL, OUT_URL)
+                current_mode = desired_mode
 
             # Write frame to ffmpeg stdin
             try:
                 ffmpeg.stdin.write(frame.tobytes())
-            except BrokenPipeError:
-                print("[main] Broken pipe to ffmpeg, exiting.", file=sys.stderr)
-                break
+            except (BrokenPipeError, OSError):
+                print("[main] Broken pipe to ffmpeg, will restart.", file=sys.stderr)
+                stop_ffmpeg(ffmpeg)
+                ffmpeg = None
+                current_mode = None
+                # skip sleep; next loop will restart ffmpeg
+                continue
 
             # Keep roughly real-time pace
             elapsed = time.time() - loop_start
@@ -198,14 +301,8 @@ def main():
 
     finally:
         reader.stop()
-        if ffmpeg.stdin:
-            try:
-                ffmpeg.stdin.close()
-            except Exception:
-                pass
-        if ffmpeg.poll() is None:
-            ffmpeg.terminate()
         reader.join()
+        stop_ffmpeg(ffmpeg)
         print("[main] Clean shutdown")
 
 

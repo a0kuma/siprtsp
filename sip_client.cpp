@@ -7,6 +7,9 @@
 #include <csignal>
 #include <cstdlib>
 #include <atomic>
+#include <cstdint>
+#include <mutex>
+#include <unordered_set>
 #include <linphone++/linphone.hh>
 
 using namespace std;
@@ -23,8 +26,61 @@ string VIRTUAL_SPK = "rtsp://140.112.31.164:8554/u5004/spk";
 string VIRTUAL_MIC_DEVICE = "RTSP_Mic";       // Remap-source with Record capability
 string VIRTUAL_SPK_DEVICE = "RTSP_Speaker";   // Sink for speaker output
 
+// Local webhook endpoints triggered on call lifecycle
+const string START_HOOK_URL = "http://127.0.0.1:59473/start";
+const string STOP_HOOK_URL = "http://127.0.0.1:59473/stop";
+
+// Fire-and-forget curl request without blocking call processing
+void triggerCurlHook(const string& url) {
+    thread([url]() {
+        string cmd = "curl -s -m 5 -o /dev/null \"" + url + "\"";
+        std::system(cmd.c_str());
+    }).detach();
+}
+
 // Global flag for shutdown
 volatile sig_atomic_t g_running = 1;
+
+mutex g_hookMutex;
+unordered_set<string> g_activeCallHooks;
+
+static string getCallIdentifier(const shared_ptr<Call>& call) {
+    if (!call) {
+        return "";
+    }
+    auto log = call->getCallLog();
+    if (log) {
+        auto id = log->getCallId();
+        if (!id.empty()) {
+            return id;
+        }
+    }
+    return to_string(reinterpret_cast<uintptr_t>(call.get()));
+}
+
+static bool registerCallHook(const shared_ptr<Call>& call) {
+    string id = getCallIdentifier(call);
+    if (id.empty()) {
+        return false;
+    }
+    lock_guard<mutex> lock(g_hookMutex);
+    auto [_, inserted] = g_activeCallHooks.insert(id);
+    return inserted;
+}
+
+static bool clearCallHook(const shared_ptr<Call>& call) {
+    string id = getCallIdentifier(call);
+    if (id.empty()) {
+        return false;
+    }
+    lock_guard<mutex> lock(g_hookMutex);
+    auto it = g_activeCallHooks.find(id);
+    if (it == g_activeCallHooks.end()) {
+        return false;
+    }
+    g_activeCallHooks.erase(it);
+    return true;
+}
 
 void signal_handler(int signum) {
     cout << "\n[ep] Ctrl+C, shutting down..." << endl;
@@ -191,12 +247,20 @@ public:
                 params->enableAudio(true);
                 params->enableVideo(false);
                 call->acceptWithParams(params);
+
+                if (registerCallHook(call)) {
+                    triggerCurlHook(START_HOOK_URL);
+                }
                 break;
             }
             
             case Call::State::StreamsRunning: {
                 // Call is established and media is flowing
                 cout << "[call " << callId << "] CONFIRMED, audio streams running" << endl;
+
+                if (registerCallHook(call)) {
+                    triggerCurlHook(START_HOOK_URL);
+                }
                 
                 // Show current device configuration (set at core startup)
                 auto inputDevice = call->getInputAudioDevice();
@@ -221,11 +285,17 @@ public:
             case Call::State::Released: {
                 // Call ended
                 cout << "[call " << callId << "] DISCONNECTED, cleanup" << endl;
+                if (clearCallHook(call)) {
+                    triggerCurlHook(STOP_HOOK_URL);
+                }
                 break;
             }
             
             case Call::State::Error: {
                 cout << "[call " << callId << "] ERROR: " << message << endl;
+                if (clearCallHook(call)) {
+                    triggerCurlHook(STOP_HOOK_URL);
+                }
                 break;
             }
             
